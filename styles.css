@@ -211,11 +211,17 @@ body {
 }
 
 .legend-item,
-.metric-status-line,
-.metric-heading {
+.metric-status-line {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
+}
+
+.metric-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .risk-dot {
@@ -253,17 +259,13 @@ body {
 
 .metric-status-line {
   gap: 6px;
-  margin-left: 1.1rem;
   color: #d3e2f1;
   font-size: 11px;
   line-height: 1.1;
   white-space: nowrap;
-  flex-wrap: nowrap;
-  flex: 0 0 auto;
 }
 
 .metric-risk-label {
-  margin-left: 0.35rem;
   white-space: nowrap;
   display: inline-block;
   vertical-align: middle;
