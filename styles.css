@@ -219,10 +219,11 @@ body {
 
 .metric-heading {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
 }
+
 
 .risk-dot {
   width: 10px;
@@ -258,18 +259,24 @@ body {
 }
 
 .metric-status-line {
+  display: flex;
+  align-items: center;
   gap: 6px;
   color: #d3e2f1;
   font-size: 11px;
   line-height: 1.1;
   white-space: nowrap;
+  margin-left: 4px;
 }
+
 
 .metric-risk-label {
   white-space: nowrap;
   display: inline-block;
   vertical-align: middle;
+  margin-left: 0;
 }
+
 
 .metric-card strong {
   display: block;
