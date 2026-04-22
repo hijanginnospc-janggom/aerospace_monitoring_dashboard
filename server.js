@@ -207,7 +207,7 @@ async function fetchNaverNews(query) {
 }
 
 async function fetchFxSnapshot() {
-  const data = await fetchJson("https://api.frankfurter.dev/v2/rates?base=EUR&symbols=USD,GBP,KRW,CNY,JPY");
+  const data = await fetchJson("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD,GBP,KRW,CNY,JPY");
   const rates = data?.rates || {};
   const krwPerEur = rates.KRW;
 
@@ -256,40 +256,69 @@ async function fetchWtiSeries() {
       year: buildYearlyAverage(points).map((item) => item.value)
     }
   };
+
 }
 
 async function fetchAluminumSeries() {
-  const csv = await fetchText("https://www.marketwatch.com/investing/future/ali00/download-data?countrycode=uk&mod=mw_quote_tab");
-  const points = normalizeCsvPoints(csv.replace(/^Date,Close/i, "DATE,VALUE"));
+  const csv = await fetchText("https://fred.stlouisfed.org/graph/fredgraph.csv?id=PALUMUSDM");
+  const points = normalizeCsvPoints(csv);
   const latest = points[points.length - 1];
   const previous = points[points.length - 2] || latest;
 
   return {
-    label: "LME 알루미늄",
+    label: "알루미늄",
     latestValue: latest.value,
     latestDisplay: formatNumber(latest.value, 2),
     change: latest.value - previous.value,
     changeLabel: `${latest.value - previous.value >= 0 ? "+" : ""}${formatNumber(latest.value - previous.value, 2)}`,
     updatedAt: latest.date,
     updatedLabel: latest.date,
-    source: "MarketWatch / LME",
+    source: "FRED / IMF",
     ranges: {
       week: points.slice(-7).map((point) => point.value),
-      month: groupMonthlyAverage(points.slice(-370), 12).map((item) => Number(item.value.toFixed(2))),
+      month: points.slice(-12).map((point) => Number(point.value.toFixed(2))),
       year: buildYearlyAverage(points).map((item) => item.value)
     }
   };
 }
 
+
 async function fetchMarketBundle() {
-  const [fx, oil, aluminum] = await Promise.all([
+  const [fxResult, oilResult, aluminumResult] = await Promise.allSettled([
     fetchFxSnapshot(),
     fetchWtiSeries(),
     fetchAluminumSeries()
   ]);
 
-  return { fx, oil, aluminum };
+  const bundle = {};
+  const errors = [];
+
+  if (fxResult.status === "fulfilled") {
+    bundle.fx = fxResult.value;
+  } else {
+    errors.push(`fx: ${fxResult.reason.message}`);
+  }
+
+  if (oilResult.status === "fulfilled") {
+    bundle.oil = oilResult.value;
+  } else {
+    errors.push(`oil: ${oilResult.reason.message}`);
+  }
+
+  if (aluminumResult.status === "fulfilled") {
+    bundle.aluminum = aluminumResult.value;
+  } else {
+    errors.push(`aluminum: ${aluminumResult.reason.message}`);
+  }
+
+  if (!bundle.fx && !bundle.oil && !bundle.aluminum) {
+    throw new Error(`All market sources failed - ${errors.join(" | ")}`);
+  }
+
+  bundle.errors = errors;
+  return bundle;
 }
+
 
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host}`);
