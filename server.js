@@ -72,6 +72,64 @@ function formatNumber(value, digits = 2) {
     maximumFractionDigits: digits
   });
 }
+function extractSmbsRate(html, patterns) {
+  const normalized = html.replace(/\s+/g, " ");
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match && match[1]) {
+      const value = Number(match[1].replace(/,/g, ""));
+      if (!Number.isNaN(value)) return value;
+    }
+  }
+  return null;
+}
+
+async function fetchSmbsFxSnapshot() {
+  const html = await fetchText("https://www.smbs.biz/Eng/ExRate/TodayExRate.jsp");
+  const dateMatch = html.match(/DATE\s*:\s*(\d{4}\.\s*\d{2}\.\s*\d{2})/i);
+
+  const usd = extractSmbsRate(html, [
+    /<td[^>]*>\s*USD\s*<\/td>[\s\S]{0,240}?<td[^>]*>\s*([0-9,]+(?:\.[0-9]+)?)\s*<\/td>/i,
+    /USD[\s\S]{0,240}?([0-9,]+(?:\.[0-9]+)?)/i
+  ]);
+
+  const gbpUsd = extractSmbsRate(html, [
+    /<td[^>]*>\s*GBP\s*\(US\$\)\s*<\/td>[\s\S]{0,240}?<td[^>]*>\s*([0-9,]+(?:\.[0-9]+)?)\s*<\/td>/i,
+    /GBP\s*\(US\$\)[\s\S]{0,240}?([0-9,]+(?:\.[0-9]+)?)/i
+  ]);
+
+  const eurUsd = extractSmbsRate(html, [
+    /<td[^>]*>\s*EUR\s*\(US\$\)\s*<\/td>[\s\S]{0,240}?<td[^>]*>\s*([0-9,]+(?:\.[0-9]+)?)\s*<\/td>/i,
+    /EUR\s*\(US\$\)[\s\S]{0,240}?([0-9,]+(?:\.[0-9]+)?)/i
+  ]);
+
+  const cnh = extractSmbsRate(html, [
+    /<td[^>]*>\s*CNH\s*<\/td>[\s\S]{0,240}?<td[^>]*>\s*([0-9,]+(?:\.[0-9]+)?)\s*<\/td>/i,
+    /CNH[\s\S]{0,240}?([0-9,]+(?:\.[0-9]+)?)/i
+  ]);
+
+  const jpy = extractSmbsRate(html, [
+    /<td[^>]*>\s*JPY\s*\(100\)\s*<\/td>[\s\S]{0,240}?<td[^>]*>\s*([0-9,]+(?:\.[0-9]+)?)\s*<\/td>/i,
+    /JPY\s*\(100\)[\s\S]{0,240}?([0-9,]+(?:\.[0-9]+)?)/i
+  ]);
+
+  if (!usd || !gbpUsd || !eurUsd || !cnh || !jpy) {
+    throw new Error("SMBS parsing failed");
+  }
+
+  return {
+    source: "SMBS",
+    updatedAt: dateMatch ? dateMatch[1].replace(/\s+/g, "").replace(/\./g, "-") : new Date().toISOString().slice(0, 10),
+    dateLabel: dateMatch ? dateMatch[1].replace(/\s+/g, "") : "",
+    items: [
+      { key: "usd", label: "미국 환율", value: usd, displayValue: `${formatNumber(usd, 2)} KRW/USD` },
+      { key: "gbp", label: "영국 환율", value: usd * gbpUsd, displayValue: `${formatNumber(usd * gbpUsd, 2)} KRW/GBP` },
+      { key: "eur", label: "유로 환율", value: usd * eurUsd, displayValue: `${formatNumber(usd * eurUsd, 2)} KRW/EUR` },
+      { key: "cny", label: "중국 환율", value: usd / cnh, displayValue: `${formatNumber(usd / cnh, 2)} KRW/CNY` },
+      { key: "jpy", label: "일본 환율", value: jpy, displayValue: `${formatNumber(jpy, 2)} KRW/100JPY` }
+    ]
+  };
+}
 
 function decodeHtml(value) {
   return String(value || "")
@@ -207,33 +265,38 @@ async function fetchNaverNews(query) {
 }
 
 async function fetchFxSnapshot() {
-  const data = await fetchJson("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD,GBP,KRW,CNY,JPY");
-  const rates = data?.rates || {};
-  const krwPerEur = rates.KRW;
+  try {
+    return await fetchSmbsFxSnapshot();
+  } catch (smbsError) {
+    const data = await fetchJson("https://api.frankfurter.app/latest?base=EUR&symbols=USD,GBP,KRW,CNY,JPY");
+    const rates = data?.rates || {};
+    const krwPerEur = rates.KRW;
 
-  if (!krwPerEur || !rates.USD || !rates.GBP || !rates.CNY || !rates.JPY) {
-    throw new Error("Failed to fetch FX data");
+    if (!krwPerEur || !rates.USD || !rates.GBP || !rates.CNY || !rates.JPY) {
+      throw new Error(`SMBS failed: ${smbsError.message} / Frankfurter failed`);
+    }
+
+    const usd = krwPerEur / rates.USD;
+    const gbp = krwPerEur / rates.GBP;
+    const eur = krwPerEur;
+    const cny = krwPerEur / rates.CNY;
+    const jpy = (krwPerEur / rates.JPY) * 100;
+
+    return {
+      source: "Frankfurter / ECB",
+      updatedAt: data.date || new Date().toISOString().slice(0, 10),
+      dateLabel: data.date || "",
+      items: [
+        { key: "usd", label: "미국 환율", value: usd, displayValue: `${formatNumber(usd, 2)} KRW/USD` },
+        { key: "gbp", label: "영국 환율", value: gbp, displayValue: `${formatNumber(gbp, 2)} KRW/GBP` },
+        { key: "eur", label: "유로 환율", value: eur, displayValue: `${formatNumber(eur, 2)} KRW/EUR` },
+        { key: "cny", label: "중국 환율", value: cny, displayValue: `${formatNumber(cny, 2)} KRW/CNY` },
+        { key: "jpy", label: "일본 환율", value: jpy, displayValue: `${formatNumber(jpy, 2)} KRW/100JPY` }
+      ]
+    };
   }
-
-  const usd = krwPerEur / rates.USD;
-  const gbp = krwPerEur / rates.GBP;
-  const eur = krwPerEur;
-  const cny = krwPerEur / rates.CNY;
-  const jpy = (krwPerEur / rates.JPY) * 100;
-
-  return {
-    source: "Frankfurter / ECB",
-    updatedAt: data.date || new Date().toISOString().slice(0, 10),
-    dateLabel: data.date || "",
-    items: [
-      { key: "usd", label: "미국 환율", value: usd, displayValue: `${formatNumber(usd, 2)} KRW/USD` },
-      { key: "gbp", label: "영국 환율", value: gbp, displayValue: `${formatNumber(gbp, 2)} KRW/GBP` },
-      { key: "eur", label: "유로 환율", value: eur, displayValue: `${formatNumber(eur, 2)} KRW/EUR` },
-      { key: "cny", label: "중국 환율", value: cny, displayValue: `${formatNumber(cny, 2)} KRW/CNY` },
-      { key: "jpy", label: "일본 환율", value: jpy, displayValue: `${formatNumber(jpy, 2)} KRW/100JPY` }
-    ]
-  };
 }
+
 
 async function fetchWtiSeries() {
   const csv = await fetchText("https://fred.stlouisfed.org/graph/fredgraph.csv?id=DCOILWTICO");
@@ -256,6 +319,7 @@ async function fetchWtiSeries() {
       year: buildYearlyAverage(points).map((item) => item.value)
     }
   };
+
 
 }
 
