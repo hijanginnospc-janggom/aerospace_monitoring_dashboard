@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>항공/우주 모니터링 시스템</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <div id="logoSlot" class="top-logo-bar">
+      <img id="companyLogo" alt="INNOSPACE 로고" src="assets/INNOSPACE_LOGO.png" />
+    </div>
+    <header class="header hero-header">
+      <div class="hero-copy">
+        <h1>항공/우주 모니터링 시스템</h1>
+        <p class="subtext">업체뉴스, 시장지표, 공급망 <span class="risk-word">리스크</span> 신호를 빠르게 확인하는 정보화면</p>
+      </div>
+      <div class="header-actions">
+        <div class="refresh-box">
+          <span>자동 업데이트</span>
+          <strong>1시간마다</strong>
+        </div>
+        <button id="refreshButton" class="primary-btn">지금 새로고침</button>
+        <button id="boardToggleButton" class="secondary-btn">게시판</button>
+      </div>
+    </header>
+
+    <section class="top-metrics">
+      <div class="metrics-head">
+        <div class="metrics-legend">
+          <span>리스크 표시 :</span>
+          <span class="legend-item"><i class="risk-dot danger"></i>높음</span>
+          <span class="legend-item"><i class="risk-dot warn"></i>주의</span>
+          <span class="legend-item"><i class="risk-dot good"></i>안정</span>
+        </div>
+      </div>
+      <div class="metric-strip" id="metricGrid"></div>
+    </section>
+
+    <section class="layout">
+      <aside class="left-panel">
+        <article class="panel sidebar-panel compact-panel">
+          <div class="panel-head favorite-head">
+            <div>
+              <p class="eyebrow">FAVORITES</p>
+              <h2>관심업체</h2>
+            </div>
+          </div>
+          <div class="favorite-list" id="favoriteList"></div>
+        </article>
+
+        <article class="panel sidebar-panel">
+          <div class="panel-head domestic-head">
+            <div>
+              <p class="eyebrow">DOMESTIC SUPPLIERS</p>
+              <h2>국내</h2>
+            </div>
+          </div>
+          <div class="search-box">
+            <input id="domesticSearch" type="text" placeholder="국내 공급업체 검색" />
+          </div>
+          <div class="company-list" id="domesticList"></div>
+        </article>
+
+        <article class="panel sidebar-panel">
+          <div class="panel-head global-head">
+            <div>
+              <p class="eyebrow">GLOBAL SUPPLIERS</p>
+              <h2>해외</h2>
+            </div>
+          </div>
+          <div class="search-box">
+            <input id="globalSearch" type="text" placeholder="해외 공급업체 검색" />
+          </div>
+          <div class="company-list" id="globalList"></div>
+        </article>
+      </aside>
+
+      <main class="main-panel">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">SUPPLIER NEWS</p>
+              <h2 id="newsTitle">전체 최신 뉴스</h2>
+            </div>
+            <div class="news-actions">
+              <span id="newsModeBadge" class="mode-badge">전체 뉴스 모드</span>
+              <button id="showAllNewsButton" class="secondary-btn">전체 뉴스 보기</button>
+              <div class="source-links" id="sourceLinks"></div>
+            </div>
+          </div>
+          <div class="news-list" id="newsList"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">SELECTED SUPPLIER</p>
+              <h2 id="companyTitle">공급업체 정보</h2>
+            </div>
+            <button id="favoriteToggleButton" class="secondary-btn">관심업체 추가</button>
+          </div>
+          <div id="companyDetail" class="company-detail"></div>
+          <div class="memo-box">
+            <div class="panel-head compact-head">
+              <div>
+                <p class="eyebrow">SUPPLIER MEMO</p>
+                <h2>업체 메모</h2>
+              </div>
+            </div>
+            <textarea id="supplierMemo" placeholder="선택한 업체에 대한 메모를 입력해 주세요"></textarea>
+            <div class="memo-actions">
+              <button id="saveMemoButton" class="primary-btn">메모 저장</button>
+              <span id="memoStatus" class="memo-status"></span>
+            </div>
+          </div>
+        </article>
+      </main>
+    </section>
+  </div>
+
+  <aside id="boardPanel" class="board-panel hidden">
+    <div class="board-head">
+      <div>
+        <p class="eyebrow">REQUEST BOARD</p>
+        <h2>게시판</h2>
+      </div>
+      <button id="boardCloseButton" class="close-btn">닫기</button>
+    </div>
+    <div class="board-form board-form-inline">
+      <select id="requestType">
+        <option value="기능요청">기능요청</option>
+        <option value="업체추가">업체추가</option>
+        <option value="기타">기타</option>
+      </select>
+      <input id="requestInput" type="text" maxlength="30" placeholder="최대 30자까지 입력" />
+      <button id="saveRequestButton" class="primary-btn">등록</button>
+    </div>
+    <div class="request-list" id="requestList"></div>
+  </aside>
+
+  <div id="chartModal" class="modal hidden">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-card">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">TREND VIEW</p>
+          <h2 id="chartTitle">지표 추이</h2>
+        </div>
+        <button id="closeModal" class="close-btn">닫기</button>
+      </div>
+      <div class="modal-toolbar">
+        <div id="chartRangeButtons" class="range-switcher hidden"></div>
+        <p id="chartSource" class="chart-source"></p>
+      </div>
+      <div id="chartContent" class="chart-content"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

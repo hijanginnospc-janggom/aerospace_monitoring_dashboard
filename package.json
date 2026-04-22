@@ -1,0 +1,13 @@
+{
+  "name": "aerospace-monitoring-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aerospace monitoring dashboard with deployable server-side market and news APIs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
