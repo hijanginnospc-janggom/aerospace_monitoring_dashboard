@@ -212,10 +212,23 @@ body {
 
 .legend-item,
 .metric-status-line {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: nowrap;
+  gap: 6px;
+  color: #d3e2f1;
+  font-size: 11px;
+  line-height: 1.1;
+  white-space: nowrap;
+  margin-left: 4px;
+  margin-top: 0;
 }
+
+.metric-card .metric-status-line,
+.metric-card .metric-status-line span {
+  display: inline-flex;
+  margin-top: 0;
+}
+
 
 .metric-heading {
   display: flex;
