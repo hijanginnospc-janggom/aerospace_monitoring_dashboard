@@ -5,6 +5,17 @@ const { URL } = require("url");
 
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
+const MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
+const NEWS_CACHE_TTL_MS = 3 * 60 * 1000;
+
+const cacheStore = {
+  market: {
+    expiresAt: 0,
+    data: null,
+    pending: null
+  },
+  news: new Map()
+};
 
 const CONTENT_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -21,6 +32,43 @@ const CONTENT_TYPES = {
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
+}
+
+function getNewsCacheEntry(query) {
+  if (!cacheStore.news.has(query)) {
+    cacheStore.news.set(query, {
+      expiresAt: 0,
+      data: null,
+      pending: null
+    });
+  }
+
+  return cacheStore.news.get(query);
+}
+
+async function getCachedPayload(entry, ttlMs, loader) {
+  const now = Date.now();
+
+  if (entry.data && entry.expiresAt > now) {
+    return entry.data;
+  }
+
+  if (entry.pending) {
+    return entry.pending;
+  }
+
+  entry.pending = (async () => {
+    try {
+      const data = await loader();
+      entry.data = data;
+      entry.expiresAt = Date.now() + ttlMs;
+      return data;
+    } finally {
+      entry.pending = null;
+    }
+  })();
+
+  return entry.pending;
 }
 
 function serveStatic(res, filePath) {
@@ -383,13 +431,34 @@ async function fetchMarketBundle() {
   return bundle;
 }
 
+async function fetchNewsBundle(query) {
+  const settled = await Promise.allSettled([
+    fetchGoogleNews(query),
+    fetchNaverNews(query)
+  ]);
+
+  const items = uniqueByUrl(
+    settled
+      .filter((result) => result.status === "fulfilled")
+      .flatMap((result) => result.value)
+  )
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 12);
+
+  return { items };
+}
+
 
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, `http://${req.headers.host}`);
 
   if (requestUrl.pathname === "/api/market") {
     try {
-      const data = await fetchMarketBundle();
+      const data = await getCachedPayload(
+        cacheStore.market,
+        MARKET_CACHE_TTL_MS,
+        () => fetchMarketBundle()
+      );
       sendJson(res, 200, data);
     } catch (error) {
       sendJson(res, 500, {
@@ -403,20 +472,12 @@ const server = http.createServer(async (req, res) => {
   if (requestUrl.pathname === "/api/news") {
     try {
       const query = requestUrl.searchParams.get("query") || "항공우주 방산 공급망";
-      const settled = await Promise.allSettled([
-        fetchGoogleNews(query),
-        fetchNaverNews(query)
-      ]);
-
-      const items = uniqueByUrl(
-        settled
-          .filter((result) => result.status === "fulfilled")
-          .flatMap((result) => result.value)
-      )
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 12);
-
-      sendJson(res, 200, { items });
+      const data = await getCachedPayload(
+        getNewsCacheEntry(query),
+        NEWS_CACHE_TTL_MS,
+        () => fetchNewsBundle(query)
+      );
+      sendJson(res, 200, data);
     } catch (error) {
       sendJson(res, 500, {
         error: "Failed to fetch news",
