@@ -484,7 +484,7 @@ function renderFavorites() {
   favoriteList.querySelectorAll(".favorite-chip").forEach((node) => {
     node.addEventListener("click", async () => {
       selectedCompany = companies.find((company) => company.id === node.dataset.id) || null;
-      await renderAllCompanySections();
+      await renderAllCompanySections({ deferNews: true });
     });
   });
 }
@@ -624,7 +624,7 @@ function renderCompanyList(type, searchText = "") {
   list.querySelectorAll(".company-item").forEach((item) => {
     item.addEventListener("click", async () => {
       selectedCompany = companies.find((entry) => entry.id === item.dataset.id) || null;
-      await renderAllCompanySections();
+      await renderAllCompanySections({ deferNews: true });
     });
   });
 }
@@ -734,6 +734,26 @@ async function renderNews() {
   }
 }
 
+function renderNewsLoading() {
+  const newsTitle = document.getElementById("newsTitle");
+  const list = document.getElementById("newsList");
+  newsTitle.textContent = selectedCompany ? `${selectedCompany.name} 愿???댁뒪` : "?꾩껜 理쒖떊 ?댁뒪";
+  renderNewsMode();
+  buildSourceLinks();
+  list.innerHTML = `<div class="detail-card"><p>${selectedCompany ? `${selectedCompany.name} 愿???댁뒪瑜?잠깐 뒤에 이어서 遺덈윭?ㅻ땲??` : "?꾩껜 怨듦툒留?理쒖떊 ?댁뒪瑜?잠깐 뒤에 이어서 遺덈윭?ㅻ땲??"}</p></div>`;
+}
+
+function queueNewsRender() {
+  window.setTimeout(() => {
+    renderNews().catch(() => {
+      const list = document.getElementById("newsList");
+      if (list) {
+        list.innerHTML = `<div class="detail-card"><p>?댁뒪瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲?? ?곷떒 Google, Naver 踰꾪듉?쇰줈 吏곸젒 ?뺤씤??二쇱꽭??</p></div>`;
+      }
+    });
+  }, 0);
+}
+
 function renderBoard() {
   const items = getBoardItems();
   const list = document.getElementById("requestList");
@@ -749,11 +769,17 @@ function renderBoard() {
   `).join("");
 }
 
-async function renderAllCompanySections() {
+async function renderAllCompanySections(options = {}) {
+  const { deferNews = false } = options;
   renderFavorites();
   renderCompanyList("domestic", document.getElementById("domesticSearch").value);
   renderCompanyList("global", document.getElementById("globalSearch").value);
   renderCompanyDetail();
+  if (deferNews) {
+    renderNewsLoading();
+    queueNewsRender();
+    return;
+  }
   await renderNews();
 }
 
@@ -867,17 +893,17 @@ function bindEvents() {
   document.getElementById("domesticSearch").addEventListener("input", (event) => renderCompanyList("domestic", event.target.value));
   document.getElementById("globalSearch").addEventListener("input", (event) => renderCompanyList("global", event.target.value));
   document.getElementById("refreshButton").addEventListener("click", async () => {
-    await refreshAllLiveData();
-    await renderAllCompanySections();
+    await refreshAllLiveData({ rerenderNews: false });
+    await renderAllCompanySections({ deferNews: true });
   });
   document.getElementById("showAllNewsButton").addEventListener("click", async () => {
     selectedCompany = null;
-    await renderAllCompanySections();
+    await renderAllCompanySections({ deferNews: true });
   });
   document.getElementById("favoriteToggleButton").addEventListener("click", async () => {
     if (!selectedCompany) return;
     toggleFavorite(selectedCompany.id);
-    await renderAllCompanySections();
+    await renderAllCompanySections({ deferNews: true });
   });
   document.getElementById("saveMemoButton").addEventListener("click", () => {
     const textarea = document.getElementById("supplierMemo");
@@ -923,7 +949,7 @@ async function init() {
   renderMetrics();
   renderSummary();
   renderBoard();
-  await renderAllCompanySections();
+  await renderAllCompanySections({ deferNews: true });
   bindEvents();
   setInterval(() => {
     refreshAllLiveData({ rerenderNews: true });
